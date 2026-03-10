@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能节能系统管理界面 v6.0</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #0a0a0f;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 20px 30px;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 500;
+            color: #00d4ff;
+        }
+        
+        .header .subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .container {
+            padding: 20px 30px;
+            max-width: 1920px;
+            margin: 0 auto;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        
+        .card {
+            background: #14141f;
+            border-radius: 12px;
+            border: 1px solid #2a2a3e;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #1e1e32 100%);
+            padding: 15px 20px;
+            border-bottom: 1px solid #2a2a3e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-header h2 {
+            font-size: 16px;
+            font-weight: 500;
+            color: #00d4ff;
+        }
+        
+        .card-header .status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            background: #2a2a3e;
+        }
+        
+        .card-header .status.active {
+            background: #00d4ff22;
+            color: #00d4ff;
+        }
+        
+        .card-body {
+            padding: 20px;
+        }
+        
+        /* 状态卡片 */
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .status-item {
+            background: #1a1a2e;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3e;
+        }
+        
+        .status-item .label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .status-item .value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .status-item .value.warning {
+            color: #ffa500;
+        }
+        
+        .status-item .value.danger {
+            color: #ff4757;
+        }
+        
+        .status-item .unit {
+            font-size: 14px;
+            color: #666;
+            margin-left: 5px;
+        }
+        
+        /* 可视化画布 */
+        .visualization {
+            background: #0a0a0f;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #lightMap, #personMap {
+            width: 100%;
+            height: 300px;
+            background: #0a0a0f;
+        }
+        
+        /* 图表容器 */
+        .chart-container {
+            position: relative;
+            height: 250px;
+        }
+        
+        /* 列表 */
+        .list {
+            list-style: none;
+        }
+        
+        .list-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        
+        .list-item .name {
+            color: #ccc;
+        }
+        
+        .list-item .value {
+            color: #00d4ff;
+            font-family: monospace;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* 动画 */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .updating {
+            animation: pulse 1s infinite;
+        }
+        
+        /* 图例 */
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏢 智能节能系统管理界面 v6.0</h1>
+        <div class="subtitle">实时监控灯光位置、摄像头校准、人员分布、热负荷与功耗</div>
+    </div>
+    
+    <div class="container">
+        <div class="grid">
+            <!-- 实时状态卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>📊 实时状态</h2>
+                    <span class="status active" id="connectionStatus">● 已连接</span>
+                </div>
+                <div class="card-body">
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="label">室内温度</div>
+                            <div class="value" id="indoorTemp">--<span class="unit">°C</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">室外温度</div>
+                            <div class="value" id="outdoorTemp">--<span class="unit">°C</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">当前人数</div>
+                            <div class="value" id="peopleCount">--<span class="unit">人</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">空调状态</div>
+                            <div class="value" id="acStatus">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 热负荷卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>🌡️ 热负荷分析</h2>
+                    <span class="status" id="thermalStatus">实时计算</span>
+                </div>
+                <div class="card-body">
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="label">总热负荷</div>
+                            <div class="value warning" id="thermalLoad">--<span class="unit">W</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">需制冷量</div>
+                            <div class="value danger" id="coolingRequired">--<span class="unit">W</span></div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="margin-top: 15px;">
+                        <canvas id="thermalChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 功耗统计卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>⚡ 功耗统计</h2>
+                    <span class="status" id="powerStatus">实时监控</span>
+                </div>
+                <div class="card-body">
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="label">空调功耗</div>
+                            <div class="value" id="acPower">--<span class="unit">W</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">风扇功耗</div>
+                            <div class="value" id="fanPower">--<span class="unit">W</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">累计能耗</div>
+                            <div class="value" id="totalEnergy">--<span class="unit">Wh</span></div>
+                        </div>
+                        <div class="status-item">
+                            <div class="label">运行成本</div>
+                            <div class="value" id="energyCost">--<span class="unit">元</span></div>
+                        </div>
+                    </div>
+                    <div class="chart-container" style="margin-top: 15px;">
+                        <canvas id="powerChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 灯光位置可视化 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>💡 灯光位置分布</h2>
+                    <span class="status">校准后位置</span>
+                </div>
+                <div class="card-body">
+                    <div class="visualization">
+                        <canvas id="lightMap"></canvas>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #00ff88;"></div>
+                            <span>开启</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #444;"></div>
+                            <span>关闭</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #00d4ff44;"></div>
+                            <span>照明范围</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 人员位置热力图 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>👥 人员位置分布</h2>
+                    <span class="status">实时检测</span>
+                </div>
+                <div class="card-body">
+                    <div class="visualization">
+                        <canvas id="personMap"></canvas>
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ff4757;"></div>
+                            <span>人员位置</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #ffa502;"></div>
+                            <span>热力区域</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 摄像头校准 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>📷 摄像头相对位置</h2>
+                    <span class="status">多摄像头校准</span>
+                </div>
+                <div class="card-body">
+                    <ul class="list" id="cameraList">
+                        <li class="list-item">
+                            <span class="name">加载中...</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 热负荷分解 -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>🔥 热负荷来源分解</h2>
+                    <span class="status">实时分析</span>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="thermalBreakdownChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 控制决策日志 -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-header">
+                    <h2>📝 控制决策日志</h2>
+                    <span class="status">最近10条</span>
+                </div>
+                <div class="card-body">
+                    <ul class="list" id="decisionLog">
+                        <li class="list-item">
+                            <span class="name">系统初始化完成</span>
+                            <span class="value" id="currentTime"></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // WebSocket连接
+        const socket = io();
+        
+        // 图表实例
+        let thermalChart, powerChart, thermalBreakdownChart;
+        
+        // 初始化图表
+        function initCharts() {
+            // 热负荷历史图表
+            const thermalCtx = document.getElementById('thermalChart').getContext('2d');
+            thermalChart = new Chart(thermalCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '总热负荷 (W)',
+                        data: [],
+                        borderColor: '#ffa500',
+                        backgroundColor: '#ffa50022',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: '需制冷量 (W)',
+                        data: [],
+                        borderColor: '#00d4ff',
+                        backgroundColor: '#00d4ff22',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#888' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#666' },
+                            grid: { color: '#2a2a3e' }
+                        },
+                        y: {
+                            ticks: { color: '#666' },
+                            grid: { color: '#2a2a3e' }
+                        }
+                    }
+                }
+            });
+            
+            // 功耗历史图表
+            const powerCtx = document.getElementById('powerChart').getContext('2d');
+            powerChart = new Chart(powerCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '空调 (W)',
+                        data: [],
+                        borderColor: '#00ff88',
+                        backgroundColor: '#00ff8822',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: '风扇 (W)',
+                        data: [],
+                        borderColor: '#00d4ff',
+                        backgroundColor: '#00d4ff22',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#888' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#666' },
+                            grid: { color: '#2a2a3e' }
+                        },
+                        y: {
+                            ticks: { color: '#666' },
+                            grid: { color: '#2a2a3e' }
+                        }
+                    }
+                }
+            });
+            
+            // 热负荷分解饼图
+            const breakdownCtx = document.getElementById('thermalBreakdownChart').getContext('2d');
+            thermalBreakdownChart = new Chart(breakdownCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['人体', '设备', '围护结构', '太阳辐射'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#ff4757', '#ffa502', '#00d4ff', '#fffa65'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#888' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 绘制灯光地图
+        function drawLightMap(lights) {
+            const canvas = document.getElementById('lightMap');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            // 清空
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, w, h);
+            
+            if (!lights || lights.length === 0) {
+                ctx.fillStyle = '#444';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无灯光配置数据', w/2, h/2);
+                return;
+            }
+            
+            // 绘制灯光区域
+            lights.forEach(light => {
+                const x = (light.x / 640) * w;
+                const y = (light.y / 480) * h;
+                const radius = (light.radius / 640) * w;
+                
+                // 照明范围
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#00ff8822';
+                ctx.fill();
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // 灯位置
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#00ff88';
+                ctx.fill();
+                
+                // 标签
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px sans-serif';
+                ctx.fillText(light.name, x - 20, y - 15);
+            });
+        }
+        
+        // 绘制人员位置热力图
+        function drawPersonMap(positions) {
+            const canvas = document.getElementById('personMap');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            // 清空
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, w, h);
+            
+            // 绘制网格
+            ctx.strokeStyle = '#1a1a2e';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < w; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, h);
+                ctx.stroke();
+            }
+            for (let i = 0; i < h; i += 40) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(w, i);
+                ctx.stroke();
+            }
+            
+            if (!positions || positions.length === 0) {
+                ctx.fillStyle = '#444';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无人员检测数据', w/2, h/2);
+                return;
+            }
+            
+            // 绘制热力
+            positions.forEach(pos => {
+                const x = (pos.x / 640) * w;
+                const y = (pos.y / 480) * h;
+                
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 30);
+                gradient.addColorStop(0, '#ff4757aa');
+                gradient.addColorStop(1, '#ff475700');
+                
+                ctx.beginPath();
+                ctx.arc(x, y, 30, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // 中心点
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff4757';
+                ctx.fill();
+            });
+            
+            // 显示人数
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(`检测人数: ${positions.length}`, 10, 25);
+        }
+        
+        // 更新摄像头列表
+        function updateCameraList(cameras) {
+            const list = document.getElementById('cameraList');
+            
+            if (!cameras || cameras.length === 0) {
+                list.innerHTML = '<li class="list-item"><span class="name">暂无摄像头校准数据</span></li>';
+                return;
+            }
+            
+            list.innerHTML = cameras.map(cam => `
+                <li class="list-item">
+                    <span class="name">${cam.id} ${cam.is_reference ? '(参考)' : ''}</span>
+                    <span class="value">
+                        偏移(${cam.relative_offset[0].toFixed(3)}, ${cam.relative_offset[1].toFixed(3)})
+                        缩放${cam.scale_factor.toFixed(3)}
+                    </span>
+                </li>
+            `).join('');
+        }
+        
+        // 更新决策日志
+        function updateDecisionLog(status) {
+            const log = document.getElementById('decisionLog');
+            const time = new Date().toLocaleTimeString();
+            
+            const newItem = document.createElement('li');
+            newItem.className = 'list-item';
+            newItem.innerHTML = `
+                <span class="name">${status.decision_reason || '状态更新'}</span>
+                <span class="value">${time}</span>
+            `;
+            
+            log.insertBefore(newItem, log.children[1]);
+            
+            // 保持最多10条
+            while (log.children.length > 11) {
+                log.removeChild(log.lastChild);
+            }
+        }
+        
+        // 更新UI
+        function updateUI(data) {
+            // 温度
+            document.getElementById('indoorTemp').innerHTML = 
+                (data.indoor_temp || '--') + '<span class="unit">°C</span>';
+            document.getElementById('outdoorTemp').innerHTML = 
+                (data.outdoor_temp || '--') + '<span class="unit">°C</span>';
+            
+            // 人数
+            document.getElementById('peopleCount').innerHTML = 
+                (data.people_count || '0') + '<span class="unit">人</span>';
+            
+            // 空调状态
+            const acStatus = document.getElementById('acStatus');
+            acStatus.textContent = data.ac_status === 'on' ? '开启' : '关闭';
+            acStatus.className = 'value ' + (data.ac_status === 'on' ? '' : 'warning');
+            
+            // 热负荷
+            document.getElementById('thermalLoad').innerHTML = 
+                Math.round(data.thermal_load || 0) + '<span class="unit">W</span>';
+            document.getElementById('coolingRequired').innerHTML = 
+                Math.round(data.cooling_required || 0) + '<span class="unit">W</span>';
+            
+            // 功耗
+            document.getElementById('acPower').innerHTML = 
+                Math.round(data.ac_power || 0) + '<span class="unit">W</span>';
+            document.getElementById('fanPower').innerHTML = 
+                Math.round(data.fan_power || 0) + '<span class="unit">W</span>';
+            document.getElementById('totalEnergy').innerHTML = 
+                Math.round(data.total_energy_wh || 0) + '<span class="unit">Wh</span>';
+            
+            // 成本估算 (0.6元/度)
+            const cost = ((data.total_energy_wh || 0) / 1000 * 0.6).toFixed(2);
+            document.getElementById('energyCost').innerHTML = 
+                cost + '<span class="unit">元</span>';
+            
+            // 更新时间
+            document.getElementById('currentTime').textContent = 
+                new Date().toLocaleTimeString();
+        }
+        
+        // 更新图表
+        function updateCharts(thermalHistory, powerHistory) {
+            // 限制数据点数量
+            const maxPoints = 20;
+            
+            // 更新热负荷图表
+            if (thermalHistory && thermalHistory.length > 0) {
+                const labels = thermalHistory.slice(-maxPoints).map(h => {
+                    const d = new Date(h.timestamp);
+                    return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+                });
+                const loadData = thermalHistory.slice(-maxPoints).map(h => h.load);
+                const coolingData = thermalHistory.slice(-maxPoints).map(h => h.cooling_required);
+                
+                thermalChart.data.labels = labels;
+                thermalChart.data.datasets[0].data = loadData;
+                thermalChart.data.datasets[1].data = coolingData;
+                thermalChart.update('none');
+                
+                // 更新热负荷分解
+                const latest = thermalHistory[thermalHistory.length - 1];
+                if (latest && latest.components) {
+                    thermalBreakdownChart.data.datasets[0].data = [
+                        latest.components.person,
+                        latest.components.equipment,
+                        latest.components.envelope,
+                        latest.components.solar
+                    ];
+                    thermalBreakdownChart.update('none');
+                }
+            }
+            
+            // 更新功耗图表
+            if (powerHistory && powerHistory.length > 0) {
+                const labels = powerHistory.slice(-maxPoints).map(h => {
+                    const d = new Date(h.timestamp);
+                    return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+                });
+                const acData = powerHistory.slice(-maxPoints).map(h => h.ac);
+                const fanData = powerHistory.slice(-maxPoints).map(h => h.fan);
+                
+                powerChart.data.labels = labels;
+                powerChart.data.datasets[0].data = acData;
+                powerChart.data.datasets[1].data = fanData;
+                powerChart.update('none');
+            }
+        }
+        
+        // 加载全局数据
+        async function loadGlobalData() {
+            try {
+                const response = await fetch('/api/global');
+                const data = await response.json();
+                
+                // 更新灯光地图
+                drawLightMap(data.lights);
+                
+                // 更新摄像头列表
+                updateCameraList(data.cameras);
+                
+                // 更新人员位置
+                drawPersonMap(data.person_positions);
+                
+                // 更新图表
+                updateCharts(data.thermal_history, data.power_history);
+                
+            } catch (error) {
+                console.error('加载全局数据失败:', error);
+            }
+        }
+        
+        // WebSocket事件
+        socket.on('connect', () => {
+            console.log('已连接到服务器');
+            document.getElementById('connectionStatus').textContent = '● 已连接';
+            document.getElementById('connectionStatus').className = 'status active';
+            
+            // 加载初始数据
+            loadGlobalData();
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('与服务器断开连接');
+            document.getElementById('connectionStatus').textContent = '● 已断开';
+            document.getElementById('connectionStatus').className = 'status';
+        });
+        
+        socket.on('status_update', (data) => {
+            updateUI(data);
+            updateDecisionLog(data);
+        });
+        
+        // 初始化
+        window.addEventListener('load', () => {
+            initCharts();
+            loadGlobalData();
+            
+            // 定期刷新全局数据
+            setInterval(loadGlobalData, 10000);
+        });
+        
+        // 窗口大小改变时重绘
+        window.addEventListener('resize', () => {
+            loadGlobalData();
+        });
+    </script>
+</body>
+</html>
