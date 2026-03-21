@@ -1,0 +1,71 @@
+# 智能交通能源管理系统依赖
+
+# 基础依赖
+numpy>=1.24.0
+pandas>=2.0.0
+opencv-python>=4.8.0
+pyyaml>=6.0
+requests>=2.31.0
+pillow>=10.0.0
+scipy>=1.11.0
+
+# YOLO检测 (Ultralytics YOLO12)
+ultralytics>=8.3.0
+
+# 多目标跟踪
+# BoT-SORT 需要从源码安装: pip install git+https://github.com/NirAharon/BoT-SORT.git
+# 或使用兼容的跟踪器
+lap>=0.4.0  # 线性分配问题求解器
+
+# 车辆重识别 (FastReID)
+# FastReID 需要从源码安装: pip install git+https://github.com/JDAI-CV/fast-reid.git
+torch>=2.0.0
+torchvision>=0.15.0
+timm>=0.9.0
+
+# 交通仿真
+sumo-rl>=1.4.0
+traci>=1.20.0
+
+# 强化学习
+stable-baselines3>=2.2.0
+gymnasium>=0.29.0
+tensorboard>=2.14.0
+
+# 优化求解
+ortools>=9.8.0
+
+# 预测
+prophet>=1.1.0
+
+# 数据库
+psycopg2-binary>=2.9.0
+# timescaledb 通过PostgreSQL扩展
+# pymilvus>=2.3.0  # 可选: Milvus向量数据库
+
+# API
+fastapi>=0.104.0
+uvicorn>=0.24.0
+websockets>=12.0
+python-multipart>=0.0.6
+
+# 类型注解
+pydantic>=2.5.0
+typing-extensions>=4.8.0
+
+# 测试
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-benchmark>=4.0.0
+pytest-cov>=4.1.0
+
+# 代码质量
+pylint>=3.0.0
+black>=23.0.0
+mypy>=1.7.0
+
+# 开发工具
+jupyter>=1.0.0
+matplotlib>=3.8.0
+seaborn>=0.13.0
+tqdm>=4.66.0

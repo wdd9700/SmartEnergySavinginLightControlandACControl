@@ -1,0 +1,184 @@
+# 智能交通能源管理系统 - 默认配置
+
+# 系统配置
+system:
+  name: "Smart Traffic Energy System"
+  version: "1.0.0"
+  log_level: "INFO"
+  log_dir: "logs/traffic_energy"
+
+# 检测配置
+detection:
+  # YOLO模型配置
+  model:
+    name: "yolo12n.pt"  # 可选: yolo12n.pt, yolo12s.pt, yolo12m.pt
+    conf_threshold: 0.5
+    iou_threshold: 0.45
+    device: "auto"  # auto, cpu, cuda:0, cuda:1
+    classes: [2, 3, 5, 7]  # COCO: car, motorcycle, bus, truck
+    
+  # 跟踪器配置 (BoT-SORT)
+  tracker:
+    type: "botsort"
+    track_high_thresh: 0.6
+    track_low_thresh: 0.1
+    new_track_thresh: 0.7
+    track_buffer: 60  # 帧数
+    match_thresh: 0.8
+    proximity_thresh: 0.5
+    appearance_thresh: 0.25
+    cmc_method: "ecc"  # ecc, orb, none
+    frame_rate: 30
+    lambda_: 0.985
+
+  # 速度估计配置
+  speed_estimation:
+    enabled: true
+    calibration_method: "homography"  # homography, reference_points
+    fps: 30
+    smoothing_window: 5
+
+# 摄像头配置
+cameras:
+  # 摄像头拓扑配置
+  topology:
+    - camera_id: "cam_001"
+      name: "路口东"
+      location: [116.3974, 39.9093]
+      stream_url: "rtsp://192.168.1.101/stream"
+      roi: [[0, 0], [1920, 0], [1920, 1080], [0, 1080]]
+      direction: "westbound"
+      next_cameras: ["cam_002"]
+      
+    - camera_id: "cam_002"
+      name: "路口西"
+      location: [116.3964, 39.9093]
+      stream_url: "rtsp://192.168.1.102/stream"
+      roi: [[0, 0], [1920, 0], [1920, 1080], [0, 1080]]
+      direction: "eastbound"
+      next_cameras: ["cam_001"]
+
+# 重识别配置 (FastReID)
+reid:
+  model:
+    name: "veriwild_bagtricks_R50-ibn"
+    path: "models/fastreid/veriwild_bagtricks_R50-ibn.pth"
+    device: "auto"
+    input_size: [128, 256]
+    feature_dim: 2048
+    
+  database:
+    type: "milvus"  # milvus, pgvector, chromadb
+    host: "localhost"
+    port: 19530
+    collection_name: "vehicle_features"
+    metric_type: "COSINE"
+    
+  matching:
+    top_k: 10
+    similarity_threshold: 0.7
+    temporal_constraint: 300  # 秒，最大合理通行时间
+    spatial_constraint: 1000  # 米，最大合理距离
+
+# 流量分析配置
+traffic_analysis:
+  # 虚拟线圈配置
+  virtual_loops:
+    - loop_id: "loop_001"
+      camera_id: "cam_001"
+      polygon: [[100, 500], [400, 500], [400, 600], [100, 600]]
+      direction: "entering"
+      
+  # 拥堵检测配置
+  congestion:
+    speed_threshold_slow: 20  # km/h
+    speed_threshold_congested: 10  # km/h
+    density_threshold: 0.7
+    min_vehicles: 5
+
+# 信号优化配置
+signal_optimization:
+  # SUMO配置
+  sumo:
+    binary: "sumo-gui"  # sumo, sumo-gui
+    net_file: "signal_opt/sumo_configs/intersection.net.xml"
+    route_file: "signal_opt/sumo_configs/traffic.rou.xml"
+    config_file: "signal_opt/sumo_configs/simulation.sumocfg"
+    step_length: 1.0  # 秒
+    
+  # 强化学习配置
+  rl:
+    algorithm: "PPO"  # PPO, SAC
+    policy: "MlpPolicy"
+    learning_rate: 0.0003
+    n_steps: 2048
+    batch_size: 64
+    n_epochs: 10
+    gamma: 0.99
+    verbose: 1
+    tensorboard_log: "logs/tensorboard"
+    
+  # Webster算法配置
+  webster:
+    min_green_time: 10  # 秒
+    max_green_time: 60  # 秒
+    yellow_time: 3  # 秒
+    all_red_time: 2  # 秒
+
+# 充电桩调度配置
+charging:
+  # 需求预测配置
+  prediction:
+    model: "prophet"
+    forecast_horizon: 24  # 小时
+    retrain_interval: 86400  # 秒
+    
+  # 调度器配置
+  scheduler:
+    solver: "CP-SAT"  # CP-SAT, SCIP
+    max_wait_time: 30  # 分钟
+    cost_weight: 0.6
+    wait_time_weight: 0.4
+    
+  # 电网监测配置
+  grid:
+    voltage_min: 210  # V
+    voltage_max: 230  # V
+    frequency_min: 49.5  # Hz
+    frequency_max: 50.5  # Hz
+    demand_response_threshold: 0.8
+
+# 数据存储配置
+data:
+  # 时序数据库 (TimescaleDB)
+  timeseries:
+    type: "timescaledb"
+    host: "localhost"
+    port: 5432
+    database: "traffic_energy"
+    user: "postgres"
+    password: "password"
+    
+  # 轨迹数据保留策略
+  retention:
+    trajectory_days: 30
+    flow_days: 365
+    events_days: 90
+
+# API配置
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  cors_origins: ["*"]
+  
+  # WebSocket配置
+  websocket:
+    ping_interval: 20
+    ping_timeout: 10
+    
+  # 认证配置
+  auth:
+    enabled: false
+    secret_key: "your-secret-key-change-in-production"
+    token_expire_minutes: 60

@@ -1,0 +1,180 @@
+# 摄像头拓扑配置
+# 定义摄像头之间的空间关系和时间约束
+
+camera_network:
+  name: "城市交通监控网络"
+  description: "主要路口摄像头覆盖"
+  
+  # 摄像头节点
+  nodes:
+    - id: "cam_001"
+      name: "路口A-东"
+      location:
+        lat: 39.9093
+        lon: 116.3974
+        altitude: 10
+      stream_url: "rtsp://192.168.1.101/stream"
+      direction: 270  # 朝向角度，0=北，90=东，180=南，270=西
+      roi:
+        - [100, 100]
+        - [1820, 100]
+        - [1820, 980]
+        - [100, 980]
+      calibration_points:  # 用于速度估计的标定点
+        - pixel: [960, 540]
+          world: [0, 0, 0]
+        - pixel: [1000, 540]
+          world: [10, 0, 0]
+      
+    - id: "cam_002"
+      name: "路口A-西"
+      location:
+        lat: 39.9093
+        lon: 116.3964
+        altitude: 10
+      stream_url: "rtsp://192.168.1.102/stream"
+      direction: 90
+      roi:
+        - [100, 100]
+        - [1820, 100]
+        - [1820, 980]
+        - [100, 980]
+      calibration_points:
+        - pixel: [960, 540]
+          world: [0, 0, 0]
+        - pixel: [1000, 540]
+          world: [10, 0, 0]
+      
+    - id: "cam_003"
+      name: "路口B-北"
+      location:
+        lat: 39.9103
+        lon: 116.3969
+        altitude: 12
+      stream_url: "rtsp://192.168.1.103/stream"
+      direction: 180
+      roi:
+        - [100, 100]
+        - [1820, 100]
+        - [1820, 980]
+        - [100, 980]
+      calibration_points:
+        - pixel: [960, 540]
+          world: [0, 0, 0]
+        - pixel: [1000, 540]
+          world: [10, 0, 0]
+      
+    - id: "cam_004"
+      name: "路口B-南"
+      location:
+        lat: 39.9083
+        lon: 116.3969
+        altitude: 12
+      stream_url: "rtsp://192.168.1.104/stream"
+      direction: 0
+      roi:
+        - [100, 100]
+        - [1820, 100]
+        - [1820, 980]
+        - [100, 980]
+      calibration_points:
+        - pixel: [960, 540]
+          world: [0, 0, 0]
+        - pixel: [1000, 540]
+          world: [10, 0, 0]
+
+  # 摄像头连接关系（边）
+  edges:
+    - from: "cam_001"
+      to: "cam_002"
+      distance: 100  # 米
+      min_travel_time: 5  # 秒
+      max_travel_time: 60  # 秒
+      direction: "westbound"
+      
+    - from: "cam_002"
+      to: "cam_001"
+      distance: 100
+      min_travel_time: 5
+      max_travel_time: 60
+      direction: "eastbound"
+      
+    - from: "cam_003"
+      to: "cam_004"
+      distance: 200
+      min_travel_time: 10
+      max_travel_time: 120
+      direction: "southbound"
+      
+    - from: "cam_004"
+      to: "cam_003"
+      distance: 200
+      min_travel_time: 10
+      max_travel_time: 120
+      direction: "northbound"
+
+  # 虚拟线圈配置
+  virtual_loops:
+    - loop_id: "vl_001"
+      camera_id: "cam_001"
+      name: "路口A东-入口"
+      polygon:
+        - [400, 500]
+        - [800, 500]
+        - [800, 700]
+        - [400, 700]
+      direction: "entering"
+      lane_id: "lane_001"
+      
+    - loop_id: "vl_002"
+      camera_id: "cam_001"
+      name: "路口A东-出口"
+      polygon:
+        - [1000, 500]
+        - [1400, 500]
+        - [1400, 700]
+        - [1000, 700]
+      direction: "exiting"
+      lane_id: "lane_002"
+      
+    - loop_id: "vl_003"
+      camera_id: "cam_002"
+      name: "路口A西-入口"
+      polygon:
+        - [400, 500]
+        - [800, 500]
+        - [800, 700]
+        - [400, 700]
+      direction: "entering"
+      lane_id: "lane_003"
+      
+    - loop_id: "vl_004"
+      camera_id: "cam_002"
+      name: "路口A西-出口"
+      polygon:
+        - [1000, 500]
+        - [1400, 500]
+        - [1400, 700]
+        - [1000, 700]
+      direction: "exiting"
+      lane_id: "lane_004"
+
+  # 区域定义
+  zones:
+    - zone_id: "zone_001"
+      name: "路口A区域"
+      cameras: ["cam_001", "cam_002"]
+      boundary:
+        - [116.3964, 39.9093]
+        - [116.3974, 39.9093]
+        - [116.3974, 39.9083]
+        - [116.3964, 39.9083]
+      
+    - zone_id: "zone_002"
+      name: "路口B区域"
+      cameras: ["cam_003", "cam_004"]
+      boundary:
+        - [116.3964, 39.9103]
+        - [116.3974, 39.9103]
+        - [116.3974, 39.9093]
+        - [116.3964, 39.9093]
